@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shortlink
+  labels:
+    app: shortlink
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0  # старые поды уходят только после готовности новых
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: shortlink
+  template:
+    metadata:
+      labels:
+        app: shortlink
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+      containers:
+        - name: app
+          image: shortlink  # имя и тег подставляет kustomize (images в kustomization.yaml)
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: shortlink-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: shortlink-db
+                  key: password
+          # Готовность: может ли под обслуживать запросы (есть ли база).
+          # Не готов -> под убирается из Service, но НЕ перезапускается.
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          # Живость: жив ли процесс. Не отвечает -> kubelet перезапускает контейнер.
+          # База тут не проверяется: её падение не лечится перезапуском приложения.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shortlink
+  labels:
+    app: shortlink
+spec:
+  selector:
+    app: shortlink
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

@@ -1,0 +1,37 @@
+---
+# Все значения можно переопределить в group_vars/host_vars.
+shortlink_env: default
+
+# Служебный пользователь и его открытый ключ (берётся с управляющей машины).
+shortlink_user: deploy
+shortlink_user_pubkey: "{{ lookup('ansible.builtin.file', lookup('ansible.builtin.env', 'HOME') + '/.ssh/id_ed25519.pub') }}"
+
+# SSH: запрет входа по паролю и входа root.
+shortlink_ssh_service: ssh
+
+# Firewall: SSH + порт nginx, всё остальное входящее закрыто.
+shortlink_firewall_enabled: true
+shortlink_ssh_port: 22
+
+# nginx как обратный прокси к приложению.
+shortlink_nginx_port: 80
+shortlink_server_name: "_"
+shortlink_backend_host: 127.0.0.1
+shortlink_backend_port: 8080
+# /metrics закрыт basic auth; хеш пароля (apr1) лежит в Ansible Vault.
+shortlink_metrics_user: metrics
+shortlink_metrics_password_hash: ""
+
+# Скрипты обслуживания и расписание healthcheck.sh.
+shortlink_scripts_src: "{{ playbook_dir }}/../scripts"
+shortlink_scripts_dest: /opt/shortlink/scripts
+shortlink_scripts:
+  - healthcheck.sh
+  - backup.sh
+shortlink_healthcheck_minute: "*/5"
+
+shortlink_packages:
+  - nginx
+  - ufw
+  - cron
+  - curl

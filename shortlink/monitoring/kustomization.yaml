@@ -1,0 +1,25 @@
+# Применение: kubectl apply -k monitoring/  (Secret grafana-admin создаёт ci/run-stage.sh deploy)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+resources:
+  - namespace.yaml
+  - prometheus.yaml
+  - grafana.yaml
+  - ingress.yaml
+# ConfigMap собираются из файлов. Суффикс-хеш в имени меняется при правке файла,
+# и Deployment сам перекатывается с новой конфигурацией.
+configMapGenerator:
+  - name: prometheus-config
+    files:
+      - prometheus.yml
+      - alerts.yml
+  - name: grafana-datasources
+    files:
+      - grafana/datasource.yml
+  - name: grafana-dashboard-provider
+    files:
+      - grafana/provider.yml
+  - name: grafana-dashboards
+    files:
+      - shortlink.json=grafana/dashboard.json

@@ -1,0 +1,14 @@
+# Свой реестр образов. Запуск: docker compose -f compose/registry.yml up -d
+name: registry
+
+services:
+  registry:
+    image: registry:2.8.3
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - registry-data:/var/lib/registry
+
+volumes:
+  registry-data:

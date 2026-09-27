@@ -1,0 +1,149 @@
+---
+# В режиме --check пакеты и пользователь реально не создаются, поэтому зависящие от них
+# задачи могут не найти сервис/пользователя. Такие задачи помечены
+# ignore_errors: "{{ ansible_check_mode }}" — в обычном прогоне ошибки не глушатся.
+
+- name: Install packages
+  ansible.builtin.apt:
+    name: "{{ shortlink_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+# --- Служебный пользователь -------------------------------------------------
+- name: Create service user
+  ansible.builtin.user:
+    name: "{{ shortlink_user }}"
+    shell: /bin/bash
+    create_home: true
+    password_lock: true
+
+- name: Install service user public key
+  ansible.posix.authorized_key:
+    user: "{{ shortlink_user }}"
+    key: "{{ shortlink_user_pubkey }}"
+    exclusive: true
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Allow service user passwordless sudo
+  ansible.builtin.template:
+    src: sudoers.j2
+    dest: "/etc/sudoers.d/{{ shortlink_user }}"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: visudo -cf %s
+
+# --- SSH ---------------------------------------------------------------------
+# Drop-in файл с префиксом 00: sshd берёт первое встреченное значение,
+# поэтому он побеждает 50-cloud-init.conf и основной конфиг.
+- name: Harden sshd (no passwords, no root login)
+  ansible.builtin.template:
+    src: sshd-hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/00-shortlink-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: sshd config changed
+
+# --- Firewall ----------------------------------------------------------------
+# Сначала разрешаем SSH, потом включаем ufw — иначе отрежем себе доступ.
+- name: Allow required ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "{{ shortlink_ssh_port }}"
+    - "{{ shortlink_nginx_port }}"
+  when: shortlink_firewall_enabled
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Enable firewall with default deny for incoming
+  community.general.ufw:
+    state: enabled
+    default: deny
+    direction: incoming
+  when: shortlink_firewall_enabled
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# --- nginx -------------------------------------------------------------------
+- name: Disable default nginx site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: nginx config changed
+
+- name: Install basic auth file for /metrics
+  ansible.builtin.template:
+    src: htpasswd.j2
+    dest: /etc/nginx/shortlink.htpasswd
+    owner: root
+    group: www-data
+    mode: "0640"
+  no_log: true
+  notify: nginx config changed
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Install shortlink site config
+  ansible.builtin.template:
+    src: shortlink.conf.j2
+    dest: /etc/nginx/sites-available/shortlink.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: nginx config changed
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Enable shortlink site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/shortlink.conf
+    dest: /etc/nginx/sites-enabled/shortlink.conf
+    state: link
+  notify: nginx config changed
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Ensure nginx is running and enabled
+  ansible.builtin.service:
+    name: nginx
+    state: started
+    enabled: true
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# --- Скрипты и расписание ---------------------------------------------------
+- name: Create scripts directory
+  ansible.builtin.file:
+    path: "{{ shortlink_scripts_dest }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install maintenance scripts
+  ansible.builtin.copy:
+    src: "{{ shortlink_scripts_src }}/{{ item }}"
+    dest: "{{ shortlink_scripts_dest }}/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ shortlink_scripts }}"
+
+- name: Ensure cron is running and enabled
+  ansible.builtin.service:
+    name: cron
+    state: started
+    enabled: true
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# cron, а не systemd-таймер: одна задача модулем, работает на любом дистрибутиве,
+# вывод уходит в журнал через logger. Обоснование — docs/DECISIONS.md.
+- name: Schedule healthcheck
+  ansible.builtin.cron:
+    name: shortlink healthcheck
+    user: "{{ shortlink_user }}"
+    minute: "{{ shortlink_healthcheck_minute }}"
+    job: >-
+      {{ shortlink_scripts_dest }}/healthcheck.sh
+      --url http://127.0.0.1:{{ shortlink_nginx_port }}/readyz --no-containers
+      2>&1 | logger -t shortlink-healthcheck
+  ignore_errors: "{{ ansible_check_mode }}"

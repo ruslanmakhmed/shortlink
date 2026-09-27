@@ -1,0 +1,20 @@
+# Кластер: k3d cluster create --config k8s/k3d-cluster.yaml
+# Вместе с кластером создаётся реестр shortlink-registry:
+#   с хоста образы пушатся в localhost:5000, изнутри кластера тянутся как shortlink-registry:5000.
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: shortlink
+servers: 1
+agents: 2
+image: rancher/k3s:v1.30.4-k3s1
+ports:
+  # Входящий трафик на Ingress (traefik): http://localhost:8081
+  - port: 8081:80
+    nodeFilters:
+      - loadbalancer
+registries:
+  create:
+    name: shortlink-registry
+    host: "0.0.0.0"
+    hostPort: "5000"

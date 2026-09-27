@@ -1,0 +1,18 @@
+# В k3d по умолчанию есть traefik: kubectl get ingressclass -> traefik.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: shortlink
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: shortlink.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: shortlink
+                port:
+                  name: http

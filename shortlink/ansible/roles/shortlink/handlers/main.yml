@@ -1,0 +1,24 @@
+---
+# Обработчики запускаются один раз в конце play, сколько бы задач их ни уведомили,
+# и только если уведомившая задача вернула changed.
+- name: Validate sshd config
+  ansible.builtin.command: sshd -t
+  changed_when: false
+  listen: sshd config changed
+
+- name: Reload sshd
+  ansible.builtin.service:
+    name: "{{ shortlink_ssh_service }}"
+    state: reloaded
+  listen: sshd config changed
+
+- name: Validate nginx config
+  ansible.builtin.command: nginx -t
+  changed_when: false
+  listen: nginx config changed
+
+- name: Reload nginx
+  ansible.builtin.service:
+    name: nginx
+    state: reloaded
+  listen: nginx config changed

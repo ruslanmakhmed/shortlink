@@ -1,0 +1,34 @@
+# {{ ansible_managed }}
+# Окружение: {{ shortlink_env }}
+upstream shortlink_backend {
+    server {{ shortlink_backend_host }}:{{ shortlink_backend_port }};
+    keepalive 16;
+}
+
+server {
+    listen {{ shortlink_nginx_port }} default_server;
+    server_name {{ shortlink_server_name }};
+
+    access_log /var/log/nginx/shortlink.access.log;
+    error_log  /var/log/nginx/shortlink.error.log;
+
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_connect_timeout 3s;
+    proxy_read_timeout 10s;
+
+    # Метрики — только с паролем.
+    location = /metrics {
+        auth_basic "shortlink metrics";
+        auth_basic_user_file /etc/nginx/shortlink.htpasswd;
+        proxy_pass http://shortlink_backend;
+    }
+
+    location / {
+        proxy_pass http://shortlink_backend;
+    }
+}
