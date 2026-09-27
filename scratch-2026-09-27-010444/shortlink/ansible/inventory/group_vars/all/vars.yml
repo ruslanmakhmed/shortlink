@@ -1,0 +1,4 @@
+---
+# Открытые ссылки на значения из зашифрованного vault.yml: по имени видно, откуда значение.
+shortlink_metrics_user: "{{ vault_metrics_user }}"
+shortlink_metrics_password_hash: "{{ vault_metrics_password_hash }}"

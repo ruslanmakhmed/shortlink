@@ -1,0 +1,15 @@
+# Применение: kubectl apply -k k8s/  (Secret создаёт ci/run-stage.sh deploy — в Git паролей нет)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: shortlink
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - postgres.yaml
+  - app.yaml
+  - ingress.yaml
+images:
+  # Версия по умолчанию = последний релиз. Стадия deploy подставляет свой тег поверх.
+  - name: shortlink
+    newName: shortlink-registry:5000/shortlink
+    newTag: v1.0.0

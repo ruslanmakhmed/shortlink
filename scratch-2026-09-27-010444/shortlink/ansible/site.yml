@@ -1,0 +1,8 @@
+---
+# Подготовка узлов: служебный пользователь, SSH, firewall, nginx, скрипты и расписание.
+# Запуск: ansible-playbook site.yml --vault-password-file .vault_pass
+- name: Prepare shortlink nodes
+  hosts: shortlink_nodes
+  become: true
+  roles:
+    - role: shortlink

@@ -1,0 +1,4 @@
+---
+# vault.yml зашифрован; линтер без пароля его не читает — это ожидаемо.
+exclude_paths:
+  - inventory/group_vars/all/vault.yml

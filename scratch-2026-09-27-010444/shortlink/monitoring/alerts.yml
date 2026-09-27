@@ -1,0 +1,43 @@
+groups:
+  - name: shortlink
+    rules:
+      # for: — период ожидания: условие должно держаться столько времени подряд,
+      # иначе алерт висит в pending. Защита от срабатываний на единичный всплеск.
+      - alert: ShortlinkDatabaseUnavailable
+        expr: max(shortlink_db_up) == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Ни один под shortlink не достаёт до базы"
+          description: "shortlink_db_up = 0 на всех подах больше минуты. Проверьте postgres-0 и Secret shortlink-db."
+
+      - alert: ShortlinkTargetDown
+        expr: up{job="shortlink"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus не может снять метрики с {{ $labels.pod }}"
+
+      - alert: ShortlinkHighNotFoundRatio
+        expr: |
+          sum(rate(shortlink_redirects_not_found_total[5m]))
+            / (sum(rate(shortlink_redirects_total[5m])) + sum(rate(shortlink_redirects_not_found_total[5m])))
+            > 0.5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Больше половины переходов — по несуществующим кодам"
+
+      - alert: ShortlinkPodMemoryNearLimit
+        expr: |
+          max by (pod) (container_memory_working_set_bytes{namespace="shortlink", container="app"})
+            / max by (pod) (container_spec_memory_limit_bytes{namespace="shortlink", container="app"})
+            > 0.9
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.pod }} использует больше 90% лимита памяти"
