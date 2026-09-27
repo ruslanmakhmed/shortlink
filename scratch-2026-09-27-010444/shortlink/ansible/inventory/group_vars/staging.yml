@@ -1,5 +1,0 @@
----
-shortlink_env: staging
-shortlink_backend_host: 127.0.0.1
-shortlink_backend_port: 8080
-shortlink_healthcheck_minute: "*/5"

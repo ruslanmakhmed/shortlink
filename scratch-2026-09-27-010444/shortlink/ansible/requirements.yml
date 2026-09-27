@@ -1,7 +1,0 @@
----
-# Диапазоны версий: новые мажорные версии коллекций перестают поддерживать ansible-core 2.15–2.17.
-collections:
-  - name: ansible.posix  # authorized_key
-    version: ">=1.5.0,<2.0.0"
-  - name: community.general  # ufw
-    version: ">=8.0.0,<10.0.0"

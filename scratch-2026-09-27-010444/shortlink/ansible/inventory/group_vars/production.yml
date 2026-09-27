@@ -1,5 +1,0 @@
----
-shortlink_env: production
-shortlink_backend_host: 127.0.0.1
-shortlink_backend_port: 18080
-shortlink_healthcheck_minute: "*/1"
